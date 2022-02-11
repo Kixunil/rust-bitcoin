@@ -212,7 +212,7 @@ fn parse_signed_to_satoshi(
     }
 
     let is_negative = s.starts_with('-');
-    if is_negative {
+    if s.starts_with('-') || s.starts_with('+') {
         if s.len() == 1 {
             return Err(ParseAmountError::InvalidFormat);
         }
@@ -1617,8 +1617,18 @@ mod tests {
         assert_eq!(p("0.000000042", btc), Err(E::TooPrecise));
 
         assert_eq!(p("1", btc), Ok(Amount::from_sat(1_000_000_00)));
+        assert_eq!(sp("-1", btc), Ok(SignedAmount::from_sat(-1_000_000_00)));
+        assert_eq!(sp("+1", btc), Ok(SignedAmount::from_sat(1_000_000_00)));
+        assert_eq!(p("0.5", btc), Ok(Amount::from_sat(500_000_00)));
+        assert_eq!(sp("+0.5", btc), Ok(SignedAmount::from_sat(500_000_00)));
+        assert_eq!(sp("-0.5", btc), Ok(SignedAmount::from_sat(-500_000_00)));
+        assert_eq!(p(".5", btc), Ok(Amount::from_sat(500_000_00)));
         assert_eq!(sp("-.5", btc), Ok(SignedAmount::from_sat(-500_000_00)));
+        assert_eq!(sp("+.5", btc), Ok(SignedAmount::from_sat(500_000_00)));
         assert_eq!(p("1.1", btc), Ok(Amount::from_sat(1_100_000_00)));
+        assert_eq!(sp("+1.1", btc), Ok(SignedAmount::from_sat(1_100_000_00)));
+        assert_eq!(sp("-1.1", btc), Ok(SignedAmount::from_sat(-1_100_000_00)));
+
         assert_eq!(p("100", sat), Ok(Amount::from_sat(100)));
         assert_eq!(p("55", sat), Ok(Amount::from_sat(55)));
         assert_eq!(p("5500000000000000000", sat), Ok(Amount::from_sat(5_500_000_000_000_000_000)));
