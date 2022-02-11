@@ -1203,6 +1203,42 @@ impl<T> CheckedSum<SignedAmount> for T where T: Iterator<Item = SignedAmount> {
     }
 }
 
+impl PartialEq<SignedAmount> for Amount {
+    fn eq(&self, other: &SignedAmount) -> bool {
+        if other.is_negative() {
+            return false;
+        }
+        self.as_sat() == other.as_sat_abs()
+    }
+}
+
+impl PartialOrd<SignedAmount> for Amount {
+    fn partial_cmp(&self, other: &SignedAmount) -> Option<Ordering> {
+        if other.is_negative() {
+            return Some(Ordering::Greater);
+        }
+        self.as_sat().partial_cmp(&other.as_sat_abs())
+    }
+}
+
+impl PartialEq<Amount> for SignedAmount {
+    fn eq(&self, other: &Amount) -> bool {
+        if self.is_negative() {
+            return false;
+        }
+        self.as_sat_abs() == other.as_sat()
+    }
+}
+
+impl PartialOrd<Amount> for SignedAmount {
+    fn partial_cmp(&self, other: &Amount) -> Option<Ordering> {
+        if self.is_negative() {
+            return Some(Ordering::Less);
+        }
+        self.as_sat_abs().partial_cmp(&other.as_sat())
+    }
+}
+
 mod private {
     use ::{Amount, SignedAmount};
 
@@ -2188,6 +2224,80 @@ mod tests {
                 Err(e) => panic!("unexpected error: {}", e),
             }
         }
+    }
+
+    #[test]
+    fn eq_signed_unsigned() {
+        let signed = SignedAmount::from_sat(1);
+        let unsigned = Amount::from_sat(1);
+        assert_eq!(signed, unsigned)
+    }
+
+    #[test]
+    fn eq_unsigned_signed() {
+        let unsigned = Amount::from_sat(1);
+        let signed = SignedAmount::from_sat(1);
+        assert_eq!(unsigned, signed)
+    }
+
+    #[test]
+    fn ne_signed_unsigned() {
+        let signed = SignedAmount::from_sat(-1);
+        let unsigned = Amount::from_sat(1);
+        assert_ne!(signed, unsigned)
+    }
+
+    #[test]
+    fn ne_unsigned_signed() {
+        let unsigned = Amount::from_sat(1);
+        let signed = SignedAmount::from_sat(-1);
+        assert_ne!(unsigned, signed)
+    }
+
+    macro_rules! check_ord_signed_unsigned {
+        ($($test_name:ident, $signed:expr, $unsigned:expr, $expected:expr;)*) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    let signed = SignedAmount::from_sat($signed);
+                    let unsigned = Amount::from_sat($unsigned);
+                    assert_eq!(signed.partial_cmp(&unsigned), Some($expected))
+                }
+            )*
+        }
+    }
+
+    check_ord_signed_unsigned! {
+        check_ord_signed_unsigned_0, -1, 1, Ordering::Less;
+        check_ord_signed_unsigned_1, -1, 2, Ordering::Less;
+        check_ord_signed_unsigned_2, -2, 1, Ordering::Less;
+
+        check_ord_signed_unsigned_3, 1, 2, Ordering::Less;
+        check_ord_signed_unsigned_4, 1, 1, Ordering::Equal;
+        check_ord_signed_unsigned_5, 2, 1, Ordering::Greater;
+    }
+
+    macro_rules! check_ord_unsigned_signed {
+        ($($test_name:ident, $unsigned:expr, $signed:expr, $expected:expr;)*) => {
+            $(
+                #[test]
+                fn $test_name() {
+                    let unsigned = Amount::from_sat($unsigned);
+                    let signed = SignedAmount::from_sat($signed);
+                    assert_eq!(unsigned.partial_cmp(&signed), Some($expected))
+                }
+            )*
+        }
+    }
+
+    check_ord_unsigned_signed! {
+        check_ord_unsigned_signed_0, 1, -1, Ordering::Greater;
+        check_ord_unsigned_signed_1, 2, -1, Ordering::Greater;
+        check_ord_unsigned_signed_2, 1, -2, Ordering::Greater;
+
+        check_ord_unsigned_signed_3, 1, 2, Ordering::Less;
+        check_ord_unsigned_signed_4, 1, 1, Ordering::Equal;
+        check_ord_unsigned_signed_5, 2, 1, Ordering::Greater;
     }
 }
 
