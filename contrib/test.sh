@@ -94,8 +94,6 @@ then
     cargo new dep_test
     cd dep_test
     echo 'bitcoin = { path = "..", features = ["use-serde"] }' >> Cargo.toml
-    echo 'serde = { version = "1" }' >> Cargo.toml
-
 
     # Pin `cc` for Rust 1.29
     if [ -n "$PIN_VERSIONS" ]; then
