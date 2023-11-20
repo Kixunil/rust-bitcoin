@@ -12,6 +12,7 @@ use core::{default, ops};
 
 #[cfg(feature = "serde")]
 use ::serde::{Deserialize, Serialize};
+use internals::error::InputString;
 use internals::write_err;
 
 #[cfg(feature = "alloc")]
@@ -129,12 +130,12 @@ impl FromStr for Denomination {
         use self::ParseDenominationError::*;
 
         if CONFUSING_FORMS.contains(&s) {
-            return Err(PossiblyConfusing(s.to_owned()));
+            return Err(PossiblyConfusing(s.into()));
         };
 
         let form = self::Denomination::forms(s);
 
-        form.ok_or_else(|| Unknown(s.to_owned()))
+        form.ok_or_else(|| Unknown(s.into()))
     }
 }
 
@@ -196,9 +197,9 @@ impl From<ParseDenominationError> for ParseAmountError {
 #[non_exhaustive]
 pub enum ParseDenominationError {
     /// The denomination was unknown.
-    Unknown(String),
+    Unknown(UnknownDenominationError),
     /// The denomination has multiple possible interpretations.
-    PossiblyConfusing(String),
+    PossiblyConfusing(PossiblyConfusingDenominationError),
 }
 
 impl fmt::Display for ParseDenominationError {
@@ -206,16 +207,8 @@ impl fmt::Display for ParseDenominationError {
         use ParseDenominationError::*;
 
         match *self {
-            Unknown(ref d) => write!(f, "unknown denomination: {}", d),
-            PossiblyConfusing(ref d) => {
-                let (letter, upper, lower) = match d.chars().next() {
-                    Some('M') => ('M', "Mega", "milli"),
-                    Some('P') => ('P', "Peta", "pico"),
-                    // This panic could be avoided by adding enum ConfusingDenomination { Mega, Peta } but is it worth it?
-                    _ => panic!("invalid error information"),
-                };
-                write!(f, "the '{}' at the beginning of {} should technically mean '{}' but that denomination is uncommon and maybe '{}' was intended", letter, d, upper, lower)
-            }
+            Unknown(ref e) => write_err!(f, "denomination parse error"; e),
+            PossiblyConfusing(ref e) => write_err!(f, "denomination parse error"; e),
         }
     }
 }
@@ -229,6 +222,46 @@ impl std::error::Error for ParseDenominationError {
             Unknown(_) | PossiblyConfusing(_) => None,
         }
     }
+}
+
+/// Parsing error, unknown denomination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct UnknownDenominationError(InputString);
+
+impl fmt::Display for UnknownDenominationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.unknown_variant("bitcoin denomination", f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for UnknownDenominationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+impl From<&str> for UnknownDenominationError {
+    fn from(s: &str) -> Self { Self(s.into()) }
+}
+
+/// Parsing error, possibly confusing denomination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PossiblyConfusingDenominationError(InputString);
+
+impl fmt::Display for PossiblyConfusingDenominationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: possibly confusing denomination - we intentionally do not support 'M' and 'P' so as to not confuse mega/milli and peta/pico", self.0.display_cannot_parse("bitcoin denomination"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for PossiblyConfusingDenominationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+impl From<&str> for PossiblyConfusingDenominationError {
+    fn from(s: &str) -> Self { Self(s.into()) }
 }
 
 fn is_too_precise(s: &str, precision: usize) -> bool {
@@ -2147,11 +2180,11 @@ mod tests {
 
         assert_eq!(
             Amount::from_str("42 satoshi BTC"),
-            Err(ParseDenominationError::Unknown("satoshi BTC".to_owned()).into()),
+            Err(ParseDenominationError::Unknown("satoshi BTC".into()).into())
         );
         assert_eq!(
             SignedAmount::from_str("-42 satoshi BTC"),
-            Err(ParseDenominationError::Unknown("satoshi BTC".to_owned()).into()),
+            Err(ParseDenominationError::Unknown("satoshi BTC".into()).into())
         );
     }
 
