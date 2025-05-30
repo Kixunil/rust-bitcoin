@@ -233,6 +233,10 @@ impl HeaderAndShortIds {
             if prefill_tx {
                 let diff_idx = idx - last_prefill;
                 last_prefill = idx + 1;
+                // Ensure diff_idx fits in u16 before casting
+                if diff_idx > u16::MAX as usize {
+                    return Err(Error::InvalidPrefill);
+                }
                 prefilled.push(PrefilledTransaction {
                     idx: diff_idx as u16,
                     tx: match version {
