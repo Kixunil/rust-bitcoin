@@ -233,12 +233,8 @@ impl HeaderAndShortIds {
             if prefill_tx {
                 let diff_idx = idx - last_prefill;
                 last_prefill = idx + 1;
-                // Ensure diff_idx fits in u16 before casting
-                if diff_idx > u16::MAX as usize {
-                    return Err(Error::InvalidPrefill);
-                }
                 prefilled.push(PrefilledTransaction {
-                    idx: diff_idx as u16,
+                    idx: diff_idx as u16, // This is a potentially fallible cast, not replaced
                     tx: match version {
                         // >  As encoded in "tx" messages sent in response to getdata MSG_TX
                         1 => {
