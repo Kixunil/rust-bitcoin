@@ -13,6 +13,8 @@
 #![cfg(feature = "hex")]
 #![cfg(feature = "arbitrary")]
 
+extern crate alloc;
+
 use arbitrary::Arbitrary;
 use bitcoin_primitives::block::{Checked, Unchecked};
 use bitcoin_primitives::script::{
